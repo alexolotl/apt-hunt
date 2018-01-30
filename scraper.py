@@ -38,14 +38,27 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-def scrape_area(area):
+def scrape_area(**kwargs):
     """
     Scrapes craigslist for a certain geographic area, and finds the latest listings.
     :param area:
     :return: A list of results.
     """
-    cl_h = CraigslistHousing(site=settings.CRAIGSLIST_SITE, area=area, category=settings.CRAIGSLIST_HOUSING_SECTION,
-                             filters={'max_price': settings.MAX_PRICE, "min_price": settings.MIN_PRICE})
+
+    query = ''
+    category = 'sub'
+    area = 'brk'
+
+    if kwargs["area"]:
+        area = kwargs["area"]
+    if kwargs["section"]:
+        category = kwargs["section"]
+    if kwargs["query"]:
+        query = kwargs["query"]
+
+    # print(CraigslistHousing.show_filters())
+    cl_h = CraigslistHousing(site=settings.CRAIGSLIST_SITE, area=area, category=category,
+                             filters={'query': query, 'max_price': settings.MAX_PRICE, "min_price": settings.MIN_PRICE, "has_image": True})
 
     results = []
     gen = cl_h.get_results(sort_by='newest', geotagged=True, limit=20)
@@ -76,7 +89,7 @@ def scrape_area(area):
                 result.update(geo_data)
             else:
                 result["area"] = ""
-                result["bart"] = ""
+                # result["bart"] = ""
 
             # Try parsing the price.
             price = 0
@@ -95,8 +108,8 @@ def scrape_area(area):
                 price=price,
                 location=result["where"],
                 cl_id=result["id"],
-                area=result["area"],
-                bart_stop=result["bart"]
+                area=result["area"]
+                # bart_stop=result["bart"]
             )
 
             # Save the listing so we don't grab it again.
@@ -104,7 +117,7 @@ def scrape_area(area):
             session.commit()
 
             # Return the result if it's near a bart station, or if it is in an area we defined.
-            if len(result["bart"]) > 0 or len(result["area"]) > 0:
+            if len(result["area"]) > 0:
                 results.append(result)
 
     return results
@@ -120,10 +133,23 @@ def do_scrape():
     # Get all the results from craigslist.
     all_results = []
     for area in settings.AREAS:
-        all_results += scrape_area(area)
+        for query in settings.QUERIES:
+            all_results += scrape_area(area=area, section='sub', query=query)
 
     print("{}: Got {} results".format(time.ctime(), len(all_results)))
 
     # Post each result to slack.
     for result in all_results:
-        post_listing_to_slack(sc, result)
+        post_listing_to_slack(sc, result, '#sublets')
+
+    # Get all the results from craigslist.
+    all_results = []
+    for area in settings.AREAS:
+        for query in settings.QUERIES:
+            all_results += scrape_area(area=area, section='roo', query=query)
+
+    print("{}: Got {} results".format(time.ctime(), len(all_results)))
+
+    # Post each result to slack.
+    for result in all_results:
+        post_listing_to_slack(sc, result, '#rooms')

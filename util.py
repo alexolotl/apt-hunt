@@ -29,15 +29,20 @@ def in_box(coords, box):
         return True
     return False
 
-def post_listing_to_slack(sc, listing):
+def post_listing_to_slack(sc, listing, channel):
     """
     Posts the listing to slack.
     :param sc: A slack client.
     :param listing: A record of the listing.
     """
-    desc = "{0} | {1} | {2} | {3} | <{4}>".format(listing["area"], listing["price"], listing["bart_dist"], listing["name"], listing["url"])
+    desc = "{0} | {1} | {2}\n".format(listing["area"], listing["price"], listing["name"], listing["url"])
     sc.api_call(
-        "chat.postMessage", channel=settings.SLACK_CHANNEL, text=desc,
+        "chat.postMessage", channel=channel, text=desc,
+        username='pybot', icon_emoji=':robot_face:'
+    )
+    url = "{}".format(listing["url"])
+    sc.api_call(
+        "chat.postMessage", channel=channel, text=url,
         username='pybot', icon_emoji=':robot_face:'
     )
 
@@ -62,14 +67,14 @@ def find_points_of_interest(geotag, location):
             area_found = True
 
     # Check to see if the listing is near any transit stations.
-    for station, coords in settings.TRANSIT_STATIONS.items():
-        dist = coord_distance(coords[0], coords[1], geotag[0], geotag[1])
-        if (min_dist is None or dist < min_dist) and dist < settings.MAX_TRANSIT_DIST:
-            bart = station
-            near_bart = True
-
-        if (min_dist is None or dist < min_dist):
-            bart_dist = dist
+    # for station, coords in settings.TRANSIT_STATIONS.items():
+    #     dist = coord_distance(coords[0], coords[1], geotag[0], geotag[1])
+    #     if (min_dist is None or dist < min_dist) and dist < settings.MAX_TRANSIT_DIST:
+    #         bart = station
+    #         near_bart = True
+    #
+    #     if (min_dist is None or dist < min_dist):
+    #         bart_dist = dist
 
     # If the listing isn't in any of the boxes we defined, check to see if the string description of the neighborhood
     # matches anything in our list of neighborhoods.
@@ -80,8 +85,8 @@ def find_points_of_interest(geotag, location):
 
     return {
         "area_found": area_found,
-        "area": area,
-        "near_bart": near_bart,
-        "bart_dist": bart_dist,
-        "bart": bart
+        "area": area
+        # "near_bart": near_bart,
+        # "bart_dist": bart_dist,
+        # "bart": bart
     }
